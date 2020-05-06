@@ -1,0 +1,207 @@
+<title>开启头部工具栏 - 数据表格</title>
+
+<div class="layui-card layadmin-header">
+  <div class="layui-breadcrumb" lay-filter="breadcrumb">
+    <a lay-href="">主页</a>
+    <a><cite>增删改查测试</cite></a>
+  </div>
+</div>
+
+<div class="layui-fluid">
+  <div class="layui-row layui-col-space15">
+    <div class="layui-col-md12">
+      <div class="layui-card">
+        <div class="layui-card-header">增删改查测试</div>
+        <div class="layui-card-body">
+          <table class="layui-hide" id="test-table-toolbar" lay-filter="test-table-toolbar"></table>
+
+          <script type="text/html" templet id="test-table-toolbar-toolbarDemo">
+            <div class="layui-btn-container">
+              <button class="layui-btn layui-btn-sm" lay-event="getCheckData">获取选中行数据</button>
+              <button class="layui-btn layui-btn-sm" lay-event="getCheckLength">获取选中数目</button>
+              <button class="layui-btn layui-btn-sm" lay-event="isAll">验证是否全选</button>
+              <button class="layui-btn layui-btn-sm" lay-event="add">添加数据</button>
+              <button class="layui-btn layui-btn-danger layui-btn-sm" lay-event="delmove">删除多行</button>
+            </div>
+          </script>
+
+          <script type="text/html" id="test-table-toolbar-barDemo">
+            <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+            <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+          </script>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  layui.use(['admin', 'table', 'view', 'form'], function () {
+    var admin = layui.admin
+      , view = layui.view
+      , form = layui.form
+      , table = layui.table;
+
+    table.render({
+      elem: '#test-table-toolbar'
+      , url: layui.setter.host.apiurl + "all"
+      , toolbar: '#test-table-toolbar-toolbarDemo'
+      , title: '用户数据表'
+      , cols: [[
+        { type: 'checkbox', fixed: 'left' }
+        , { field: 'id', title: 'ID', width: 80, fixed: 'left', unresize: true, sort: true }
+        , { field: 'title', title: '标题', width: 120, edit: 'text' }
+        , { field: 'sketch', title: '描述', width: 120, edit: 'text' }
+        // ,{field:'email', title:'邮箱', width:150, edit: 'text', templet: function(res){
+        //   return '<strong>'+ res.email +'</strong>'
+        // }}
+        , { fixed: 'right', title: '操作', toolbar: '#test-table-toolbar-barDemo', width: 150 }
+      ]]
+      , page: true
+      , limit: 10   //默认十条数据一页
+      , limits: [10, 20, 30, 50]  //数据分页条
+    });
+
+    //头工具栏事件
+    table.on('toolbar(test-table-toolbar)', function (obj) {
+      var checkStatus = table.checkStatus(obj.config.id);
+      switch (obj.event) {
+        case 'getCheckData':
+          var data = checkStatus.data;
+          layer.alert(JSON.stringify(data));
+          break;
+        case 'getCheckLength':
+          var data = checkStatus.data;
+          layer.msg('选中了：' + data.length + ' 个');
+          break;
+        case 'isAll':
+          layer.msg(checkStatus.isAll ? '全选' : '未全选');
+          break;
+        case 'add':
+          admin.popup({
+            title: '添加数据'
+            , area: ['450px', '400px']
+            , id: 'LAY-popup-content-tags'
+            , success: function (layero, index) {
+              view(this.id).render('crudtest/crud_form', data).done(function () {
+                form.render(null, 'layuiadmin-form-tags');
+
+                //监听提交
+                form.on('submit(layuiadmin-app-tags-submit)', function (data) {
+                  var field = data.field; //获取提交的字段
+                  // console.log(field)
+                  //提交 Ajax 成功后，关闭当前弹层并重载表格
+                  //$.ajax({});
+                  admin.req({
+                    url: layui.setter.host.apiurl + "save",
+                    data: field,
+                    type: 'post',
+                    dataType: 'json',
+                    success: function (res) {
+                      if (res.status === 200) {
+                        layer.alert('添加成功', { icon: 6 });
+                      }
+                    }
+                  })
+                  layui.table.reload('test-table-toolbar'); //重载表格
+                  layer.close(index); //执行关闭 
+                });
+              });
+            }
+          });
+          break;
+        case 'delmove':
+          layer.confirm('确定要删除多行吗？', {
+            btn: ['确定', '取消'] //按钮
+          }, function () {
+            // layer.msg('的确很重要', { icon: 1 });
+            var data = checkStatus.data;
+            console.log(data)
+            let ids = []
+            for (let i = 0; i < data.length; i++) {
+              ids.push(data[i].id)
+            }
+            if (data.length) {
+              admin.req({
+                url: layui.setter.host.apiurl + "delmove",
+                data: {ids:JSON.stringify(ids)},// 这里需要转化为对象才行
+                type: 'post',
+                dataType: 'json',
+                success: function (res) {
+                  if (res.status === 200) {
+                    layer.alert('删除多行成功', { icon: 6 });
+                    layui.table.reload('test-table-toolbar'); //重载表格
+                    layer.close();
+                  }
+                }
+              })
+            }
+            else{
+              layer.msg('您还没有勾选任意行', { icon: 1 })
+            }
+
+          }, function () {
+            layer.close(); //执行关闭 
+          });
+          break;
+      };
+    });
+
+    //监听行工具事件
+    table.on('tool(test-table-toolbar)', function (obj) {
+      var data = obj.data;
+      if (obj.event === 'del') {
+        layer.confirm('真的删除行么', function (index) {
+          admin.req({
+            url: layui.setter.host.apiurl + "del",
+            data: data,
+            type: 'post',
+            dataType: 'json',
+            success: function (res) {
+              if (res.status === 200) {
+                layer.msg('删除成功', { icon: 6 });
+                obj.del();
+                layer.close(index);
+              }
+            }
+          })
+        });
+      } else if (obj.event === 'edit') {
+        admin.popup({
+          title: '编辑数据'
+          , area: ['450px', '400px']
+          , id: 'LAY-popup-content-tags'
+          , success: function (layero, index) {
+            view(this.id).render('crudtest/crud_form', data).done(function () {
+              form.render(null, 'layuiadmin-form-tags');
+              //监听提交
+              form.on('submit(layuiadmin-app-tags-submit)', function (data) {
+                var field = data.field; //获取提交的字段
+                // console.log(field)
+                //提交 Ajax 成功后，关闭当前弹层并重载表格
+                //$.ajax({});
+                admin.req({
+                  url: layui.setter.host.apiurl + "update",
+                  data: field,
+                  type: 'post',
+                  dataType: 'json',
+                  success: function (res) {
+                    if (res.status === 200) {
+                      layer.alert('修改成功', { icon: 6 });
+                    } else {
+                      layer.msg('修改失败!')
+                    }
+                  }
+                })
+                layui.table.reload('test-table-toolbar'); //重载表格
+                layer.close(index); //执行关闭 
+              });
+            });
+          }
+        });
+      }
+    });
+
+  });
+</script>
